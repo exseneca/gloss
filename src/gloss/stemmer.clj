@@ -342,29 +342,83 @@
 
 (def step-2b-pattern #{"arían" "arías" "arán" "arás" "aríais" "aría" "aréis" "aríamos" "aremos" "ará" "aré" "erían" "erías" "erán" "erás" "eríais" "ería" "eréis" "eríamos" "eremos" "erá" "eré" "irían" "irías" "irán" "irás" "iríais" "iría" "iréis" "iríamos" "iremos" "irá" "iré" "aba" "ada" "ida" "ía" "ara" "iera" "ad" "ed" "id" "ase" "iese" "aste" "iste" "an" "aban" "ían" "aran" "ieran" "asen" "iesen" "aron" "ieron" "ado" "ido" "ando" "iendo" "ió" "ar" "er" "ir" "as" "abas" "adas" "idas" "ías" "aras" "ieras" "ases" "ieses" "ís" "áis" "abais" "íais" "arais" "ierais" "aseis" "ieseis" "asteis" "isteis" "ados" "idos" "amos" "ábamos" "íamos" "imos" "áramos" "iéramos" "iésemos" "ásemos" "en" "es" "éis" "emos"})
 
+(defn delete-u-from-gu-when-special [special? word]
+  (if special?
+    (if (re-find #"gu$" word)
+      (delete-suffix word "u")
+      word)
+    word))
 
-(defn step-2b [config {:keys [rv]} word])
+(defn delete-u-from-gu-when-special-and-in-rv [special? rv pos word]
+  (if special?
+    (if (and (re-find #"gu$" word)
+             (>= (dec pos) (first rv)))
+      (delete-suffix word "u")
+      word)
+    word))
+
+(defn step-2b [config {:keys [rv]} word]
+  (let [re (make-suffix-regex step-2b-pattern)
+        suffix (re-find re word)
+        special-set #{"en" "es" "éis" "emos"}
+        special? (special-set suffix)]
+    (if suffix
+      (let [pos (get-pos word suffix)]
+        (if (>= pos (first rv))
+          (->> (delete-suffix word suffix)
+               (delete-u-from-gu-when-special special?))
+          word))
+      word)))
+
+(def step-3-pattern #{"os" "a" "o" "á" "í" "ó" "e" "é"})
+
+(defn step-3 [config {:keys [rv]} word]
+  (let [re (make-suffix-regex step-3-pattern)
+        suffix (re-find re word)
+        special-set #{"e" "é"}
+        special? (special-set suffix)]
+    (if suffix
+      (let [pos (get-pos word suffix)]
+        (if (>= pos (first rv))
+          (->> (delete-suffix word suffix)
+               (delete-u-from-gu-when-special-and-in-rv special? rv pos))
+          word))
+      word)))
+
+(defn switch-if-mapping [mapping c]
+  (if (mapping c)
+    (mapping c)
+    c))
+
+(defn remove-acute [word]
+  (let [mapping {\á \a
+                 \é \e
+                 \í \i
+                 \ó \o
+                 \ú \u}]
+    (->> (map (partial switch-if-mapping mapping) word)
+         (apply str))))
 
 (defn stem
   ([{:keys [vowels] :as config}
     word]
    (let [r1 (get-r1 vowels word)
          r2 (get-r2 vowels r1 word)
-         rv (get-rv vowels word)]
-     ;(println "rv: " rv)
-     (let [step-0-result (step-0 config {:rv rv} word)
+         rv (get-rv vowels word)
+         step-0-result (step-0 config {:rv rv} word)
            ;_ (print {:step-0 step-0-result})
-           step-1-result (step-1 config {:r1 r1 :r2 r2 :rv rv} step-0-result)
-           step-2a-result (if (= (count step-0-result)
-                                 (count step-1-result))
-                            (step-2a config {:rv rv} step-1-result)
-                            step-1-result)
-           step-2b-result (if (= (count step-0-result)
-                                 (count step-1-result)
-                                 (count step-2a-result))
-                            (step-2b config {:rv rv} step-2a-result)
-                            step-2a-result)]
-       step-1-result)))
+         step-1-result (step-1 config {:r1 r1 :r2 r2 :rv rv} step-0-result)
+         step-2a-result (if (= (count step-0-result)
+                               (count step-1-result))
+                          (step-2a config {:rv rv} step-1-result)
+                          step-1-result)
+         step-2b-result (if (= (count step-0-result)
+                               (count step-1-result)
+                               (count step-2a-result))
+                          (step-2b config {:rv rv} step-2a-result)
+                          step-2a-result)
+         step-3-result (step-3 config {:rv rv} step-2b-result)]
+     (remove-acute step-3-result)))
   ([word]
    (stem {:vowels vowels} word)))
 

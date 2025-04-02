@@ -1,1 +1,4 @@
-{}
+{:paths ["src"]
+ :deps {hiccup/hiccup {:mvn/version "2.0.0-RC5"}
+        metosin/reitit-ring {:mvn/version "0.8.0"}
+        ring/ring-jetty-adapter {:mvn/version "1.12.0"}}}
